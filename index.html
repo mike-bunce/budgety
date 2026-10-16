@@ -1,7 +1,102 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Budget</title>
+  <script>
+    /* ===== CONFIG: edit these two values ===== */
+    const CONFIG = {
+      // Your Apps Script web app URL (Deploy > Manage deployments > Web app URL)
+      API_URL: 'https://script.google.com/macros/s/DEPLOYMENT_ID/exec',
+      // OAuth Web Client ID (Google Cloud Console). Leave '' to skip Google Sign-In.
+      GOOGLE_CLIENT_ID: ''
+    };
+
+    /* ===== Google Sign-In (identity is sent to Apps Script as an ID token) ===== */
+    const TOKEN_KEY = 'budget-google-id-token';
+    let idToken = null, signInPromise = null;
+    try { idToken = sessionStorage.getItem(TOKEN_KEY); } catch (e) {}
+
+    function setToken(token) {
+      idToken = token;
+      try { token ? sessionStorage.setItem(TOKEN_KEY, token) : sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
+    }
+
+    function ensureSignedIn() {
+      if (!CONFIG.GOOGLE_CLIENT_ID || idToken) return Promise.resolve();
+      if (signInPromise) return signInPromise;
+      signInPromise = new Promise(resolve => {
+        const show = () => {
+          const box = document.getElementById('access-status');
+          box.hidden = false;
+          box.innerHTML = '<p style="margin:0 0 12px">Sign in with Google to continue.</p><div id="gsi-button"></div>';
+          google.accounts.id.initialize({
+            client_id: CONFIG.GOOGLE_CLIENT_ID,
+            auto_select: true,
+            callback: response => {
+              setToken(response.credential);
+              signInPromise = null;
+              box.textContent = 'Checking account access…';
+              resolve();
+            }
+          });
+          google.accounts.id.renderButton(document.getElementById('gsi-button'), { theme: 'outline', size: 'large' });
+          google.accounts.id.prompt();
+        };
+        const ready = () => { window.google.script = window.google.script || gasShim; show(); };
+        if (window.google && google.accounts && google.accounts.id) { ready(); return; }
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.onload = ready; // api() is only called after the DOM is parsed
+        document.head.appendChild(s);
+      });
+      return signInPromise;
+    }
+
+    /* ===== API transport ===== */
+    async function api(action, ...args) {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        await ensureSignedIn();
+        const payload = { action, args };
+        if (idToken) payload.idToken = idToken;
+        // No Content-Type header => "simple" request, so no CORS preflight (Apps Script can't answer one)
+        const res = await fetch(CONFIG.API_URL, { method: 'POST', redirect: 'follow', body: JSON.stringify(payload) });
+        const text = await res.text();
+        let json;
+        try { json = JSON.parse(text); }
+        catch (e) { throw new Error('Unexpected response from the server. Check that the web app is deployed with access set to "Anyone".'); }
+        if (json.error === 'AUTH_REQUIRED' && CONFIG.GOOGLE_CLIENT_ID && attempt === 0) { setToken(null); continue; }
+        if (json.error) throw new Error(json.error);
+        return json.result;
+      }
+      throw new Error('Sign-in required.');
+    }
+
+    /* ===== google.script.run compatibility shim =====
+       Lets the existing  google.script.run.withSuccessHandler(..).withFailureHandler(..).fn(args)
+       calls work unchanged by routing them through api(). */
+    function makeRunner(ok, fail) {
+      return new Proxy({}, {
+        get(_, name) {
+          if (typeof name !== 'string' || name === 'then') return undefined;
+          if (name === 'withSuccessHandler') return fn => makeRunner(fn, fail);
+          if (name === 'withFailureHandler') return fn => makeRunner(ok, fn);
+          if (name === 'withUserObject') return () => makeRunner(ok, fail);
+          return (...args) => {
+            api(name, ...args).then(
+              result => { if (ok) ok(result); },
+              error => { if (fail) fail(error instanceof Error ? error : new Error(String(error))); else console.error(name, error); }
+            );
+          };
+        }
+      });
+    }
+    const gasShim = { run: makeRunner() };
+    window.google = window.google || {};
+    window.google.script = gasShim;
+  </script>
   <style>
     :root{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#17221e;background:#f4f6f2;font-synthesis:none}
     *{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button{cursor:pointer}[hidden]{display:none!important}
@@ -289,5 +384,4 @@
     checkAccess();
     document.getElementById('budget-list').addEventListener('click',event=>{const link=event.target.closest('.budget-category-link');if(!link)return;setTimeout(()=>{if(state.page!=='expenses'||!state.selectedExpenseCategory)return;const list=$('expense-categories');if(list.querySelector('[data-expense-filter="'+CSS.escape(state.selectedExpenseCategory)+'"]'))return;const group=state.categoryGroups.get(state.selectedExpenseCategory)||'Other';list.innerHTML='<button type="button" class="expense-category-item active" data-expense-filter="'+escapeHtml(state.selectedExpenseCategory)+'" aria-pressed="true"><span>'+escapeHtml(state.selectedExpenseCategory)+'<small>'+escapeHtml(group)+'</small></span><strong>Total: '+money(0)+'</strong></button>';},0);});
   </script>
-  <script type="module" src="app.js"></script>
 </body>
