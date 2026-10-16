@@ -8,9 +8,11 @@
     /* ===== CONFIG: edit these two values ===== */
     const CONFIG = {
       // Your Apps Script web app URL (Deploy > Manage deployments > Web app URL)
-      API_URL: 'https://script.google.com/macros/s/AKfycbyxNXc6qb8CQsuZJ6sv8FYNkRgaKEI3081P_dJJkaSwafAjVrC_dPb3nSSxIsJ1vM7dUw/exec',
+      API_URL: 'https://script.google.com/macros/s/DEPLOYMENT_ID/exec',
       // OAuth Web Client ID (Google Cloud Console). Leave '' to skip Google Sign-In.
-      GOOGLE_CLIENT_ID: '427662745099-ppl7dl9df94dhf9qp59n671a5s1nudvn.apps.googleusercontent.com'
+      GOOGLE_CLIENT_ID: '427662745099-ppl7dl9df94dhf9qp59n671a5s1nudvn.apps.googleusercontent.com',
+      // Shown on the sign-in / access-denied screen
+      BRAND: { name: 'Budgety', tagline: 'Family budget', contact: '' } // contact: optional email shown when access is denied
     };
 
     /* ===== Google Sign-In (identity is sent to Apps Script as an ID token) ===== */
@@ -28,21 +30,21 @@
       if (signInPromise) return signInPromise;
       signInPromise = new Promise(resolve => {
         const show = () => {
-          const box = document.getElementById('access-status');
-          box.hidden = false;
-          box.innerHTML = '<p style="margin:0 0 12px">Sign in with Google to continue.</p><div id="gsi-button"></div>';
+          showGate('signin');
+          const skipAuto = sessionStorage.getItem('budget-no-autoselect') === '1';
           google.accounts.id.initialize({
             client_id: CONFIG.GOOGLE_CLIENT_ID,
-            auto_select: true,
+            auto_select: !skipAuto,
             callback: response => {
+              try { sessionStorage.removeItem('budget-no-autoselect'); } catch (e) {}
               setToken(response.credential);
               signInPromise = null;
-              box.textContent = 'Checking account access…';
+              showGate('checking');
               resolve();
             }
           });
           google.accounts.id.renderButton(document.getElementById('gsi-button'), { theme: 'outline', size: 'large' });
-          google.accounts.id.prompt();
+          if (!skipAuto) google.accounts.id.prompt();
         };
         const ready = () => { window.google.script = window.google.script || gasShim; show(); };
         if (window.google && google.accounts && google.accounts.id) { ready(); return; }
@@ -53,6 +55,29 @@
         document.head.appendChild(s);
       });
       return signInPromise;
+    }
+
+    /* ===== Branded gate: sign-in / checking / access denied / error ===== */
+    function showGate(kind, detail) {
+      const box = document.getElementById('access-status');
+      if (!box) return;
+      const brand = CONFIG.BRAND || {};
+      const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      const contact = brand.contact ? ' <a href="mailto:' + esc(brand.contact) + '">Contact the owner</a> if you think this is a mistake.' : '';
+      const views = {
+        checking: ['Checking your access…', esc(brand.tagline || ''), ''],
+        signin: ['Sign in to continue', 'Use the Google account that has been given access.', '<div id="gsi-button"></div>'],
+        denied: ['Access required', (detail ? 'You’re signed in as <strong>' + esc(detail) + '</strong>, which doesn’t have access.' : 'Your Google account doesn’t have access.') + contact, '<button type="button" class="gate-btn" id="gate-switch">Use a different account</button>'],
+        error: ['Something went wrong', esc(detail || 'Could not check account access.'), '<button type="button" class="gate-btn" id="gate-retry">Try again</button>']
+      };
+      const v = views[kind] || views.error;
+      box.hidden = false;
+      box.innerHTML = '<div class="gate-card"><div class="gate-mark" aria-hidden="true">' + esc((brand.name || 'B').charAt(0).toUpperCase()) + '</div>'
+        + '<div class="gate-brand">' + esc(brand.name || '') + '</div><h1>' + v[0] + '</h1><p>' + v[1] + '</p><div class="gate-actions">' + v[2] + '</div>'
+        + '<p class="gate-foot"><a href="privacy.html">Privacy Policy</a></p></div>';
+      const sw = document.getElementById('gate-switch'), retry = document.getElementById('gate-retry');
+      if (sw) sw.onclick = () => { setToken(null); try { sessionStorage.setItem('budget-no-autoselect', '1'); } catch (e) {} location.reload(); };
+      if (retry) retry.onclick = () => location.reload();
     }
 
     /* ===== API transport ===== */
@@ -69,6 +94,10 @@
         catch (e) { throw new Error('Unexpected response from the server. Check that the web app is deployed with access set to "Anyone".'); }
         if (json.error === 'AUTH_REQUIRED' && CONFIG.GOOGLE_CLIENT_ID && attempt === 0) { setToken(null); continue; }
         if (json.error) throw new Error(json.error);
+        if (!json || !('result' in json)) {
+          console.error('Unexpected API response for', action, text);
+          throw new Error('Server response had no "result" field: ' + text.slice(0, 200));
+        }
         return json.result;
       }
       throw new Error('Sign-in required.');
@@ -144,12 +173,14 @@
   <meta name="apple-mobile-web-app-title" content="My App">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#ffffff">
+<style>.gate{min-height:62vh;display:grid;place-items:center;padding:24px 0}.gate[hidden]{display:none}.gate-card{width:100%;max-width:400px;text-align:center;background:#fff;border:1px solid #e5eae5;border-radius:16px;box-shadow:0 8px 24px #203b2610;padding:36px 28px}.gate-mark{width:56px;height:56px;border-radius:16px;background:#284b38;color:#fff;display:grid;place-items:center;font-size:26px;font-weight:800;margin:0 auto 14px}.gate-brand{font-family:Helvetica,"Helvetica Neue",Arial,sans-serif;font-size:24px;font-weight:700;letter-spacing:-.02em;color:#284b38;margin-bottom:10px}.gate-card h1{font-size:22px;letter-spacing:-.03em;margin:0 0 8px}.gate-card p{margin:0 0 18px;color:#5d6b63;font-size:14px;line-height:1.55}.gate-card .gate-foot{margin:20px 0 0;font-size:12px}.gate-card a{color:#2c6a46}.gate-actions{display:flex;justify-content:center;min-height:44px}.gate-btn{border:1px solid #d9e2da;background:#fff;color:#284b38;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:650}.gate-btn:hover{background:#edf4ef}.bauhaus .gate-card{background:var(--card);border:2px solid var(--ink);border-radius:0;box-shadow:6px 6px 0 var(--ink)}.bauhaus .gate-mark{border-radius:0;background:var(--red);border:2px solid var(--ink)}.bauhaus .gate-brand{color:var(--ink)}.bauhaus .gate-btn{border:2px solid var(--ink);border-radius:0;background:var(--yellow);color:var(--ink);text-transform:uppercase;font-weight:850}</style>
+<style>.site-footer{max-width:1280px;margin:0 auto;padding:0 30px 32px;font-size:12px;text-align:center;opacity:.75}.site-footer a{color:inherit}</style>
 </head>
 <body>
   <main class="shell">
-    <header class="app-header" id="app-header"><div class="top"><div class="header-actions"><button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="page-nav"><span aria-hidden="true">☰</span> Menu</button><div class="month-control" id="month-control" hidden><label for="month">MONTH</label><select id="month" aria-label="Budget month"></select></div></div></div>
+    <header class="app-header" id="app-header" hidden><div class="top"><div class="header-actions"><button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="page-nav"><span aria-hidden="true">☰</span> Menu</button><div class="month-control" id="month-control" hidden><label for="month">MONTH</label><select id="month" aria-label="Budget month"></select></div></div></div>
       <nav class="page-nav" id="page-nav" aria-label="Budget sections" hidden><button type="button" class="active" data-page="budgets">Balances</button><button type="button" data-page="dashboard">Dashboard</button><button type="button" data-page="accounts">Accounts</button><button type="button" data-page="budgetConfig">Budget Config</button><button type="button" data-page="ledger">Ledger</button><button type="button" data-page="expenses">Expenses</button><button type="button" data-page="graphs">Graphs</button><button type="button" data-page="admin" id="admin-nav" hidden>Admin</button></nav></header>
-    <section class="panel graph-card" id="access-status" role="status" style="margin-top:20px">Checking account access…</section>
+    <section class="gate" id="access-status" role="status" aria-live="polite"></section>
     <section class="dashboard-page" id="dashboard-page" hidden><header class="dashboard-head"><div><h1>Dashboard</h1><p id="dashboard-subtitle">Monthly income, expenses, and category breakdown</p></div></header><div class="dashboard-metrics"><article class="panel dashboard-metric income"><span>Income</span><strong id="dashboard-income">—</strong></article><article class="panel dashboard-metric expenses"><span>Expenses</span><strong id="dashboard-expenses">—</strong></article><article class="panel dashboard-metric net"><span>Net</span><strong id="dashboard-net">—</strong></article></div><div class="dashboard-groups" id="dashboard-groups"><div class="dashboard-empty">Loading monthly budget…</div></div><p class="status" id="dashboard-status" role="status"></p></section>
     <div class="layout" id="accounts-page" hidden>
       <section class="panel transactions"><div class="panel-head"><div><h2 id="account-title">Transactions</h2><p id="transaction-count">Loading your budget…</p></div><nav class="account-tabs" id="account-tabs" aria-label="Accounts"></nav></div><div class="group-legend" id="group-legend" aria-label="Budget category groups"></div><div class="table-wrap"><table><thead id="table-head"></thead><tbody id="table-body"></tbody></table></div><div class="empty" id="empty" hidden>No transactions for this account yet.</div></section>
@@ -179,6 +210,7 @@
       </article>
     </div></section>
   </main>
+  <footer class="site-footer"><a href="privacy.html">Privacy Policy</a></footer>
   <script>
     const state={data:null,ledgerData:null,account:0,page:'budgets',isAdmin:false,selectedExpenseCategory:'',allYearExpenseRows:null,allYearExpenseRequest:0,pendingExpenseScroll:false,uploadRows:null,uploadText:'',uploadName:'',preview:null,uploadSkippedYear:0,categoryGroups:new Map(),groupColors:new Map(),forecast:null,ytdHidden:new Set()};let dataRequest=0;
     const $=id=>document.getElementById(id);
@@ -204,7 +236,7 @@
     function verifiedControlHtml(verified,attributes){return '<label class="verify-control"><input type="checkbox" class="transaction-verified" '+attributes+(verified?' checked':'')+'><span>'+(verified?'Verified':'Verify')+'</span></label>';}
     function setTheme(bauhaus,persist=true){$('bauhaus-theme').disabled=!bauhaus;document.body.classList.toggle('bauhaus',bauhaus);groupPalette=bauhaus?bauhausGroupPalette:classicGroupPalette;if(persist){try{localStorage.setItem('bunce-budget-theme',bauhaus?'bauhaus':'classic');}catch(error){}}if(state.data){setGroupColors(state.data);if(state.data.accounts&&state.page==='accounts')renderTransactions();if(state.data.accounts&&state.page==='graphs')renderGraphs();if(state.data.accounts&&state.page==='expenses')renderExpenses();renderBudgets();}}
     function showPage(page){if(page==='admin'&&!state.isAdmin)return;state.page=page;$('month-control').hidden=page==='budgets'||page==='ledger';$('dashboard-page').hidden=page!=='dashboard';$('accounts-page').hidden=page!=='accounts';$('budgets-page').hidden=page!=='budgets';$('budget-config-page').hidden=page!=='budgetConfig';$('ledger-page').hidden=page!=='ledger';$('admin-page').hidden=page!=='admin';$('expenses-page').hidden=page!=='expenses';$('graphs-page').hidden=page!=='graphs';document.querySelectorAll('.page-nav button').forEach(button=>button.classList.toggle('active',button.dataset.page===page));$('page-nav').classList.remove('open');$('app-header').classList.remove('nav-open');$('mobile-nav-toggle').setAttribute('aria-expanded','false');}
-    function checkAccess(){google.script.run.withSuccessHandler(result=>{if(!result.allowed){$('access-status').textContent=result.identityAvailable?'Your Google account is not on this budget’s allow list.':'Google could not identify your account. The web app must be deployed so the accessing user’s email is available.';return;}state.isAdmin=result.admin;$('page-nav').hidden=false;$('access-status').hidden=true;$('admin-nav').hidden=!result.admin;showPage('budgets');loadBudgetPage();}).withFailureHandler(error=>{$('access-status').textContent='Could not check account access: '+error.message;}).getAccessStatus();}
+    function checkAccess(){google.script.run.withSuccessHandler(result=>{if(!result.allowed){if(result.identityAvailable)showGate('denied',result.email);else showGate('error','Google could not identify your account. Please sign in again.');return;}state.isAdmin=result.admin;$('app-header').hidden=false;$('page-nav').hidden=false;$('access-status').hidden=true;$('admin-nav').hidden=!result.admin;showPage('budgets');loadBudgetPage();}).withFailureHandler(error=>{showGate('error','Could not check account access: '+error.message);}).getAccessStatus();}
     function loadAllowedUsers(){if(!state.isAdmin)return;$('admin-status').textContent='Loading users…';google.script.run.withSuccessHandler(renderAllowedUsers).withFailureHandler(error=>{$('admin-status').textContent=error.message;}).getAllowedUsers();}
     function renderAllowedUsers(users){$('admin-status').textContent=users.length+' allowed user'+(users.length===1?'':'s');$('allow-user-list').innerHTML=users.length?users.map(email=>'<tr><td>'+escapeHtml(email)+'</td><td><button type="button" class="budget-config-save allow-user-remove" data-email="'+escapeHtml(email)+'">Remove</button></td></tr>').join(''):'<tr><td colspan="2">No additional users. Admin accounts always have access.</td></tr>';}
     function saveAllowedUser(event){event.preventDefault();const input=$('allow-user-email'),button=event.submitter;button.disabled=true;$('admin-status').textContent='Adding user…';google.script.run.withSuccessHandler(users=>{$('allow-user-form').reset();button.disabled=false;renderAllowedUsers(users);$('admin-status').textContent='Added to the app allow list. Share the spreadsheet separately.';}).withFailureHandler(error=>{$('admin-status').textContent=error.message;button.disabled=false;}).addAllowedUser(input.value);}
@@ -381,7 +413,7 @@
     const currentDate=new Date();const appMonths=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];const startMonth=appMonths[currentDate.getMonth()];appMonths.forEach(month=>$('month').add(new Option(month,month)));$('month').value=startMonth;
     const baseRenderExpenses=renderExpenses;renderExpenses=function(){baseRenderExpenses();if(!Array.isArray(state.allYearExpenseRows)||!state.allYearExpenseRows.length)return;const rows=state.allYearExpenseRows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date))),tableRows=$('expense-transactions').querySelectorAll('tr');rows.forEach((item,index)=>{const row=tableRows[index];if(!row)return;row.cells[0].textContent=String(item.month||'')+' '+expenseDayLabel(item.date);row.cells[2].innerHTML='<button type="button" class="expense-account-link" data-account-index="'+Number(item.accountIndex||0)+'" data-sheet-row="'+Number(item.sheetRow||0)+'" data-month="'+escapeHtml(item.month||'')+'">'+escapeHtml(item.account||'')+'</button>';});};
     $('expense-transactions').addEventListener('click',event=>{const link=event.target.closest('.expense-account-link');if(!link)return;state.account=Number(link.dataset.accountIndex);$('month').value=link.dataset.month;state.pendingAccountTransaction=Number(link.dataset.sheetRow)||0;showPage('accounts');loadFullData();});
-    checkAccess();
+    showGate('checking');checkAccess();
     document.getElementById('budget-list').addEventListener('click',event=>{const link=event.target.closest('.budget-category-link');if(!link)return;setTimeout(()=>{if(state.page!=='expenses'||!state.selectedExpenseCategory)return;const list=$('expense-categories');if(list.querySelector('[data-expense-filter="'+CSS.escape(state.selectedExpenseCategory)+'"]'))return;const group=state.categoryGroups.get(state.selectedExpenseCategory)||'Other';list.innerHTML='<button type="button" class="expense-category-item active" data-expense-filter="'+escapeHtml(state.selectedExpenseCategory)+'" aria-pressed="true"><span>'+escapeHtml(state.selectedExpenseCategory)+'<small>'+escapeHtml(group)+'</small></span><strong>Total: '+money(0)+'</strong></button>';},0);});
   </script>
 </body>
