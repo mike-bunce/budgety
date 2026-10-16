@@ -3,7 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Budgety</title>
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <link rel="apple-touch-icon" href="/images/budgety-icon.jpeg">
+  <meta name="apple-mobile-web-app-title" content="My App">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#ffffff">
+  <title>Budget</title>
   <script>
     /* ===== CONFIG: edit these two values ===== */
     const CONFIG = {
@@ -30,8 +35,14 @@
       if (signInPromise) return signInPromise;
       signInPromise = new Promise(resolve => {
         const show = () => {
-          showGate('signin');
+          showGate('checking');
           const skipAuto = sessionStorage.getItem('budget-no-autoselect') === '1';
+          // Show the branded sign-in button only if Google can't sign the visitor in silently
+          const showSignIn = () => {
+            if (!signInPromise) return;
+            showGate('signin');
+            google.accounts.id.renderButton(document.getElementById('gsi-button'), { theme: 'outline', size: 'large' });
+          };
           google.accounts.id.initialize({
             client_id: CONFIG.GOOGLE_CLIENT_ID,
             auto_select: !skipAuto,
@@ -43,8 +54,9 @@
               resolve();
             }
           });
-          google.accounts.id.renderButton(document.getElementById('gsi-button'), { theme: 'outline', size: 'large' });
-          if (!skipAuto) google.accounts.id.prompt();
+          if (skipAuto) { showSignIn(); return; }
+          google.accounts.id.prompt(n => { if (n && typeof n.isDismissedMoment === 'function' && n.isDismissedMoment()) showSignIn(); });
+          setTimeout(showSignIn, 2500); // no silent sign-in happened: ask once
         };
         const ready = () => { window.google.script = window.google.script || gasShim; show(); };
         if (window.google && google.accounts && google.accounts.id) { ready(); return; }
