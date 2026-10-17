@@ -409,19 +409,38 @@
       color: inherit;
     }
   </style>
+  <style>
+    /* Condensed header: [menu] [logo + title] [month] on one row */
+    #app-header .top{margin-bottom:6px;padding-bottom:8px}
+    .app-header .header-actions{width:100%;justify-content:space-between;gap:12px}
+    .app-brand{display:flex;align-items:center;gap:10px;min-width:0}
+    .app-brand img{width:32px;height:32px;border-radius:8px;object-fit:cover;flex:none}
+    .app-brand-name{font-size:18px;font-weight:750;letter-spacing:-.02em;color:#284b38;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .bauhaus .app-brand-name{color:var(--ink);font-weight:850;text-transform:uppercase}
+    .bauhaus .app-brand img{border-radius:0;border:2px solid var(--ink)}
+    @media(max-width:760px){
+      .app-header .header-actions{gap:8px}
+      /* brand fills the space between the menu button and the month control, centred */
+      .app-brand{flex:1 1 auto;justify-content:center}
+      .app-brand img{width:28px;height:28px;border-radius:7px}
+      .app-brand-name{font-size:16px}
+      /* when the month control is hidden (Balances, Ledger) keep its space so the brand stays centred */
+      .month-control[hidden]{display:flex;visibility:hidden}
+    }
+  </style>
 </head>
 <body>
   <main class="shell">
-    <header class="site-main-header" style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e3e9e3;">
-      <img src="/budgety/images/budgety.jpg" alt="Budgety Logo" style="width:32px;height:32px;border-radius:8px;object-fit:cover;">
-      <h1 style="font-size:18px;margin:0;font-weight:750;letter-spacing:-.02em;color:#284b38;">Budgety</h1>
-    </header>
     <header class="app-header" id="app-header" hidden>
       <div class="top">
         <div class="header-actions">
           <button type="button" id="mobile-nav-toggle" class="mobile-nav-toggle" aria-expanded="false" aria-controls="page-nav">
             <span aria-hidden="true">☰</span> Menu
           </button>
+          <div class="app-brand">
+            <img src="/budgety/images/budgety.jpg" alt="Budgety Logo">
+            <span class="app-brand-name">Budgety</span>
+          </div>
           <div class="month-control" id="month-control" hidden>
             <label for="month">MONTH</label>
             <select id="month" aria-label="Budget month"></select>
