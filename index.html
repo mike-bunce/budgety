@@ -542,8 +542,6 @@
         <h2>Balances</h2>
         <div class="month-lock-actions">
           <span id="budget-month"></span>
-          <button type="button" id="lock-month" class="month-lock-button">Lock month</button>
-          <button type="button" id="unlock-month" class="month-unlock-button">Restore formulas</button>
           <small id="month-lock-status" role="status"></small>
         </div>
       </div>
@@ -806,7 +804,6 @@
     };
 
     let dataRequest = 0;
-    const autoLockingMonths = new Set();
     const $ = id => document.getElementById(id);
     const money = n => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD' }).format(Number(n) || 0);
     
@@ -909,6 +906,7 @@
 
     function render(data) { 
       state.data = data;
+      if (data.autoLocked) $('month-lock-status').textContent = data.month + ' automatically locked.';
       setGroupColors(data);
       renderAccountBalances(data.accountBalances); 
       
@@ -954,43 +952,6 @@
         scrollExpenseDetailsIntoView();
       }
 
-      maybeAutoLockMonth(data);
-    }
-
-    function maybeAutoLockMonth(data) {
-      if (!data || !Array.isArray(data.accounts) || !data.accounts.length) return;
-      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const monthIndex = monthNames.indexOf(data.month);
-      const year = Number(data.year);
-      if (monthIndex < 0 || !year) return;
-      const now = new Date();
-      const monthEnd = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
-      if (monthEnd >= now) return;
-      const lockKey = year + '-' + monthNames[monthIndex];
-      if ((data.monthLocks && data.monthLocks[monthNames[monthIndex]]) || data.monthLocked || autoLockingMonths.has(lockKey)) return;
-
-      const expenses = data.accounts.flatMap(account => account.transactions || []).filter(transaction => transaction.expense);
-      if (!expenses.length || expenses.some(transaction => !transaction.category || !transaction.verified)) return;
-
-      autoLockingMonths.add(lockKey);
-      $('month-lock-status').textContent = 'All expenses verified. Locking ' + monthNames[monthIndex] + '…';
-      google.script.run
-        .withSuccessHandler(result => {
-          autoLockingMonths.delete(lockKey);
-          if (result && result.locked) {
-            data.monthLocked = true;
-            data.monthLocks = Object.assign({}, data.monthLocks, { [monthNames[monthIndex]]: true });
-            if (state.data === data && state.page === 'accounts') renderTransactions();
-            $('month-lock-status').textContent = result.month + ' automatically locked.';
-          } else {
-            $('month-lock-status').textContent = 'Could not automatically lock ' + monthNames[monthIndex] + '.';
-          }
-        })
-        .withFailureHandler(error => {
-          autoLockingMonths.delete(lockKey);
-          $('month-lock-status').textContent = 'Automatic lock failed: ' + error.message;
-        })
-        .setBudgetMonthLock(monthNames[monthIndex], 'lock');
     }
 
     function setGroupColors(data) {
@@ -1183,7 +1144,7 @@
       $('transaction-count').textContent = account.transactions.length + ' entries';
       
       const card = account.kind === 'card', locked = Boolean(state.data.monthLocked);
-      $('table-head').innerHTML = '<tr><th>Date</th><th>Description</th><th>Category</th>' + (locked ? '' : '<th>Verified</th>') + (card ? '<th>Cardholder</th><th class="num">Amount</th>' : '<th class="num">Withdrawal</th><th class="num">Deposit</th>') + '</tr>';
+      $('table-head').innerHTML = '<tr><th>Date</th><th>Description</th><th>Category</th><th>Verified</th>' + (card ? '<th>Cardholder</th><th class="num">Amount</th>' : '<th class="num">Withdrawal</th><th class="num">Deposit</th>') + '</tr>';
       
       const body = $('table-body');
       body.innerHTML = '';
@@ -1208,7 +1169,7 @@
         if (card) cells = '<td>' + escapeHtml(t.cardholder || '—') + '</td><td class="num">' + money(t.amount) + '</td>';
         else cells = '<td class="num">' + (t.withdrawal ? money(t.withdrawal) : '—') + '</td><td class="num">' + (t.deposit ? money(t.deposit) : '—') + '</td>';
         
-        tr.innerHTML = '<td>' + escapeHtml(date) + '</td><td><span class="desc" title="' + description + '" tabindex="0" aria-label="Full description: ' + description + '">' + description + '</span></td><td>' + category + '</td>' + (locked ? '' : '<td>' + verified + '</td>') + cells;
+        tr.innerHTML = '<td>' + escapeHtml(date) + '</td><td><span class="desc" title="' + description + '" tabindex="0" aria-label="Full description: ' + description + '">' + description + '</span></td><td>' + category + '</td><td>' + verified + '</td>' + cells;
         body.append(tr);
       });
     }
@@ -1390,28 +1351,6 @@
           button.disabled = false;
         })
         .addBudgetCategory($('new-category-name').value, $('new-category-group').value, $('new-category-budget').value);
-    }
-
-    function setMonthLock(action) {
-      const month = $('month').value;
-      const message = action === 'lock' ? 'Lock ' + month + ' by replacing its BUDGET formulas with their current values?' : 'Restore the formulas for ' + month + ' in the BUDGET sheet?';
-      if (!window.confirm(message)) return;
-      
-      const buttons = [$(':not(#lock-month)', $('lock-month')), $('unlock-month')];
-      buttons.forEach(button => { if(button) button.disabled = true; });
-      $('month-lock-status').textContent = action === 'lock' ? 'Locking ' + month + '…' : 'Restoring ' + month + ' formulas…';
-      
-      google.script.run
-        .withSuccessHandler(result => {
-          $('month-lock-status').textContent = result.month + (result.locked ? ' locked.' : ' formulas restored.');
-          buttons.forEach(button => { if(button) button.disabled = false; });
-          load();
-        })
-        .withFailureHandler(error => {
-          $('month-lock-status').textContent = error.message;
-          buttons.forEach(button => { if(button) button.disabled = false; });
-        })
-        .setBudgetMonthLock(month, action);
     }
 
     function expenseDayLabel(value) {
@@ -1959,8 +1898,6 @@
     $('ledger-form').addEventListener('submit', moveLedgerFunds);
     $('allow-user-form').addEventListener('submit', saveAllowedUser);
     $('allow-user-list').addEventListener('click', removeAllowedUser);
-    $('lock-month').addEventListener('click', () => setMonthLock('lock'));
-    $('unlock-month').addEventListener('click', () => setMonthLock('unlock'));
     
     $('ytd-chart').addEventListener('click', e => {
       const button = e.target.closest('.ytd-legend-item');
@@ -2252,11 +2189,15 @@
       
       google.script.run
         .withSuccessHandler(result => {
-          $('status').textContent = result.verified ? 'Category saved and verified.' : 'Category saved.';
+          $('status').textContent = result.autoLocked ? 'Category saved and verified. ' + month + ' was automatically locked.' : result.verified ? 'Category saved and verified.' : 'Category saved.';
           const data = state.data, target = data && data.full && data.month === month && data.accounts && data.accounts[account] ? data.accounts[account].transactions.find(item => item.sheetRow === row) : null;
           if (!target) { load(); return; }
           target.category = result.category;
           target.verified = Boolean(result.verified);
+          if (result.autoLocked) {
+            data.monthLocked = true;
+            data.monthLocks = Object.assign({}, data.monthLocks, { [month]: true });
+          }
           state.budgetsStale = true;
           if (state.page === 'accounts') renderTransactions();
         })
@@ -2283,9 +2224,16 @@
       google.script.run
         .withSuccessHandler(result => {
           transaction.verified = result.verified;
+          if (result.autoLocked) {
+            state.data.monthLocked = true;
+            state.data.monthLocks = Object.assign({}, state.data.monthLocks, { [month]: true });
+          }
+          if (result.formulasRestored) {
+            state.data.monthLocked = false;
+            state.data.monthLocks = Object.assign({}, state.data.monthLocks, { [month]: false });
+          }
           renderTransactions();
-          $('status').textContent = result.verified ? 'Expense verified.' : 'Verification removed.';
-          maybeAutoLockMonth(state.data);
+          $('status').textContent = result.autoLocked ? 'Expense verified. ' + month + ' was automatically locked.' : result.formulasRestored ? 'Verification removed. ' + month + ' formulas were restored.' : result.verified ? 'Expense verified.' : 'Verification removed.';
         })
         .withFailureHandler(error => {
           transaction.verified = previous;
