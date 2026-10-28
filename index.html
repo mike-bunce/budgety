@@ -165,6 +165,13 @@
       if (retry) retry.onclick = () => location.reload();
     }
 
+    function hideGate() {
+      const box = document.getElementById('access-status');
+      if (!box) return;
+      box.hidden = true;
+      box.replaceChildren();
+    }
+
     /* ===== API transport ===== */
     async function api(action, ...args) {
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -1060,7 +1067,7 @@
           state.isAdmin = result.admin;
           $('app-header').hidden = false;
           $('page-nav').hidden = false;
-          $('access-status').hidden = true;
+          hideGate();
           $('admin-nav').hidden = !result.admin;
           showPage('budgets');
           
