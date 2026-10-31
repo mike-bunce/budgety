@@ -1,3 +1,6 @@
 #Ignored App Scripts files used for local dev
 Code.gs
 Lock.gs
+/Example-Data
+**/.DS_Store
+SKILL.md
