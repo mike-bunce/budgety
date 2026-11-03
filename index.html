@@ -266,6 +266,7 @@
     .projection-stamp{display:grid;justify-items:end;gap:3px}.projection-stamp strong{font-size:11px}.projection-stamp small{font-size:9px;color:#849088;font-weight:500}.bauhaus .projection-stamp small{color:#625d52}
   </style>
   <style>
+    .chart-value-tooltip{position:fixed;z-index:1000;pointer-events:none;padding:6px 9px;border:1px solid #dfe6df;border-radius:6px;background:#17221e;color:#fff;font-size:11px;font-weight:700;white-space:nowrap;box-shadow:0 4px 12px #17221e30}.chart-value-tooltip[hidden]{display:none}.bauhaus .chart-value-tooltip{border:1.5px solid var(--ink);border-radius:0;background:var(--yellow);color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
     .ytd-select-all{margin-right:8px;padding:5px 8px;border:1px solid #dfe6df;border-radius:6px;background:#fff;color:#46634f;font-size:10px;font-weight:700;cursor:pointer}.bauhaus .ytd-select-all{border:1.5px solid var(--ink);border-radius:0;background:var(--yellow);color:var(--ink);text-transform:uppercase;font-weight:850}
     .ytd-line-chart .ytd-series{fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}.ytd-line-chart .ytd-point{stroke:#fff;stroke-width:1}.ytd-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:6px 10px;max-height:230px;overflow:auto;margin-top:12px;padding-top:10px;border-top:1px solid #edf0ed}.ytd-legend-item{display:flex;align-items:center;gap:8px;min-width:0;padding:8px;border:1px solid #dfe6df;border-radius:8px;background:#fff;text-align:left;color:inherit;cursor:pointer}.ytd-legend-item[aria-pressed="false"]{background:#f5f6f4;border-style:dashed;color:#849088}.ytd-legend-item:focus-visible{outline:2px solid #477c61;outline-offset:2px}.ytd-toggle-mark{display:grid;place-items:center;flex:0 0 16px;height:16px;border:1px solid #9eaaa1;border-radius:3px;font-size:11px;line-height:1;color:#fff;background:#477c61}.ytd-legend-item[aria-pressed="false"] .ytd-toggle-mark{color:transparent;background:transparent}.ytd-legend-item>i{flex:0 0 22px;height:0;border-top-width:2px;border-top-style:solid}.ytd-legend-item[aria-pressed="false"]>i{border-color:#aeb7b0!important}.ytd-legend-item span{display:block;min-width:0}.ytd-legend-item strong,.ytd-legend-item small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ytd-legend-item strong{font-size:10px}.ytd-legend-item small{margin-top:2px;color:#849088;font-size:9px}.bauhaus .ytd-legend{border-color:#c9bda8}.bauhaus .ytd-legend-item{border:1.5px solid var(--ink);border-radius:0;font-weight:700}.bauhaus .ytd-legend-item[aria-pressed="false"]{background:#eee4d1}.bauhaus .ytd-toggle-mark{border:1.5px solid var(--ink);border-radius:0;background:var(--blue)}.bauhaus .ytd-legend-item small{color:#625d52}
   </style>
@@ -1590,7 +1591,7 @@
         const points = line.map((value, index) => x(index) + ',' + y(value));
         if (points.length) svg += '<path class="series ' + item.className + '" d="M' + points.join(' L') + '"></path>';
         line.forEach((value, index) => {
-          svg += '<circle class="point ' + item.className + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"><title>' + money(value) + '</title></circle>';
+          svg += '<circle class="point ' + item.className + '" data-value-tooltip="' + escapeHtml(money(value)) + '" aria-label="' + escapeHtml(money(value)) + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"></circle>';
         });
       });
       host.innerHTML = svg + '</svg>';
@@ -1616,7 +1617,7 @@
       });
       svg += '<path class="series" stroke="' + color + '" d="M' + amounts.map((value, index) => x(index) + ',' + y(value)).join(' L') + '"></path>';
       amounts.forEach((value, index) => {
-        svg += '<circle class="point" fill="' + color + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"><title>' + money(value) + '</title></circle>';
+        svg += '<circle class="point" fill="' + color + '" data-value-tooltip="' + escapeHtml(money(value)) + '" aria-label="' + escapeHtml(money(value)) + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"></circle>';
       });
       host.innerHTML = svg + '</svg>';
     }
@@ -1683,7 +1684,7 @@
         const points = item.monthly.map((value, index) => x(index) + ',' + y(Number(value) || 0));
         svg += '<path class="ytd-series" stroke="' + item.color + '" stroke-dasharray="' + item.dash + '" d="M' + points.join(' L') + '"></path>';
         item.monthly.forEach((value, index) => {
-          svg += '<circle class="ytd-point" fill="' + item.color + '" cx="' + x(index) + '" cy="' + y(Number(value) || 0) + '" r="2.7"><title>' + money(value) + '</title></circle>';
+          svg += '<circle class="ytd-point" fill="' + item.color + '" data-value-tooltip="' + escapeHtml(money(value)) + '" aria-label="' + escapeHtml(money(value)) + '" cx="' + x(index) + '" cy="' + y(Number(value) || 0) + '" r="2.7"></circle>';
         });
       });
       svg += '</svg>';
@@ -1846,7 +1847,7 @@
         const points = data.map((row, index) => x(index) + ',' + y(row[item.key]));
         svg += '<path class="series ' + item.className + '" d="M' + points.join(' L') + '"></path>';
         data.forEach((row, index) => {
-          svg += '<circle class="point ' + item.className + '" cx="' + x(index) + '" cy="' + y(row[item.key]) + '" r="4"><title>' + money(row[item.key]) + '</title></circle>';
+          svg += '<circle class="point ' + item.className + '" data-value-tooltip="' + escapeHtml(money(row[item.key])) + '" aria-label="' + escapeHtml(money(row[item.key])) + '" cx="' + x(index) + '" cy="' + y(row[item.key]) + '" r="4"></circle>';
         });
       });
       host.innerHTML = svg + '</svg>';
@@ -1977,6 +1978,28 @@
     $('close-import-dialog').addEventListener('click', () => $('import-dialog').close());
     $('import-dialog').addEventListener('click', event => {
       if (event.target === $('import-dialog')) $('import-dialog').close();
+    });
+    const chartTooltip = document.createElement('div');
+    chartTooltip.className = 'chart-value-tooltip';
+    chartTooltip.setAttribute('role', 'tooltip');
+    chartTooltip.hidden = true;
+    document.body.append(chartTooltip);
+    document.addEventListener('pointerover', event => {
+      const point = event.target.closest && event.target.closest('[data-value-tooltip]');
+      if (!point) return;
+      chartTooltip.textContent = point.dataset.valueTooltip;
+      chartTooltip.hidden = false;
+    });
+    document.addEventListener('pointermove', event => {
+      if (chartTooltip.hidden) return;
+      chartTooltip.style.left = Math.min(event.clientX + 12, window.innerWidth - chartTooltip.offsetWidth - 8) + 'px';
+      chartTooltip.style.top = Math.min(event.clientY + 12, window.innerHeight - chartTooltip.offsetHeight - 8) + 'px';
+    });
+    document.addEventListener('pointerout', event => {
+      if (event.target.closest && event.target.closest('[data-value-tooltip]') &&
+          !(event.relatedTarget && event.relatedTarget.closest && event.relatedTarget.closest('[data-value-tooltip]'))) {
+        chartTooltip.hidden = true;
+      }
     });
     
     $('ytd-chart').addEventListener('click', e => {
