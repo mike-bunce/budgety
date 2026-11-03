@@ -684,7 +684,7 @@
         <article class="panel graph-card">
           <header class="graph-card-head">
             <div>
-              <h2>Projections</h2>
+              <h2>Actuals and Forecast</h2>
               <p>Values from the Projections sheet · refreshed when Graphs loads</p>
             </div>
             <span class="projection-stamp"><strong id="projection-year"></strong><small id="projection-updated"></small></span>
@@ -1171,6 +1171,7 @@
       
       entries.forEach(t => {
         const tr = document.createElement('tr');
+        if (!t.category || (t.expense && !t.verified)) tr.classList.add('needs-attention');
         const date = t.date || '—';
         const description = escapeHtml(t.description || '—');
         const category = locked ? categoryPill(t.category) : categorySelectHtml(t.category, 'data-sheet-row="' + t.sheetRow + '" data-previous="' + escapeHtml(t.category || '') + '"', false);
