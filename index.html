@@ -64,6 +64,7 @@
               } catch (e) {}
               setToken(response.credential);
               signInPromise = null;
+              hideGate();
               showGate('checking');
               resolve();
             }
@@ -104,6 +105,11 @@
     function showGate(kind, detail) {
       const box = document.getElementById('access-status');
       if (!box) return;
+      if (kind === 'checking') {
+        box.hidden = true;
+        box.replaceChildren();
+        return;
+      }
       const brand = CONFIG.BRAND || {};
       const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ 
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' 
@@ -111,11 +117,6 @@
       const contact = brand.contact ? ' <a href="mailto:' + esc(brand.contact) + '">Contact the owner</a> if you think this is a mistake.' : '';
       
       const views = {
-        checking: [
-          'Checking your access…', 
-          esc(brand.tagline || ''), 
-          ''
-        ],
         signin: [
           'Welcome to Budgety', 
           'A powerful, streamlined household budget planner built to keep your finances clear, collaborative, and entirely under your control.', 
@@ -281,7 +282,7 @@
       padding: 24px 0;
     }
     .gate[hidden] {
-      display: none;
+      display: none !important;
     }
     .gate-card {
       width: 100%;
