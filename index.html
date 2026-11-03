@@ -1590,7 +1590,7 @@
         const points = line.map((value, index) => x(index) + ',' + y(value));
         if (points.length) svg += '<path class="series ' + item.className + '" d="M' + points.join(' L') + '"></path>';
         line.forEach((value, index) => {
-          svg += '<circle class="point ' + item.className + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"><title>' + item.name + ' · ' + state.data.months[index] + ': ' + money(value) + '</title></circle>';
+          svg += '<circle class="point ' + item.className + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"><title>' + money(value) + '</title></circle>';
         });
       });
       host.innerHTML = svg + '</svg>';
@@ -1616,7 +1616,7 @@
       });
       svg += '<path class="series" stroke="' + color + '" d="M' + amounts.map((value, index) => x(index) + ',' + y(value)).join(' L') + '"></path>';
       amounts.forEach((value, index) => {
-        svg += '<circle class="point" fill="' + color + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"><title>' + label + ' · ' + state.data.months[index] + ': ' + money(value) + '</title></circle>';
+        svg += '<circle class="point" fill="' + color + '" cx="' + x(index) + '" cy="' + y(value) + '" r="4"><title>' + money(value) + '</title></circle>';
       });
       host.innerHTML = svg + '</svg>';
     }
@@ -1683,7 +1683,7 @@
         const points = item.monthly.map((value, index) => x(index) + ',' + y(Number(value) || 0));
         svg += '<path class="ytd-series" stroke="' + item.color + '" stroke-dasharray="' + item.dash + '" d="M' + points.join(' L') + '"></path>';
         item.monthly.forEach((value, index) => {
-          svg += '<circle class="ytd-point" fill="' + item.color + '" cx="' + x(index) + '" cy="' + y(Number(value) || 0) + '" r="2.7"><title>' + escapeHtml(item.category) + ' · ' + months[index] + ': ' + money(value) + '</title></circle>';
+          svg += '<circle class="ytd-point" fill="' + item.color + '" cx="' + x(index) + '" cy="' + y(Number(value) || 0) + '" r="2.7"><title>' + money(value) + '</title></circle>';
         });
       });
       svg += '</svg>';
@@ -1846,7 +1846,7 @@
         const points = data.map((row, index) => x(index) + ',' + y(row[item.key]));
         svg += '<path class="series ' + item.className + '" d="M' + points.join(' L') + '"></path>';
         data.forEach((row, index) => {
-          svg += '<circle class="point ' + item.className + '" cx="' + x(index) + '" cy="' + y(row[item.key]) + '" r="4"><title>' + item.name + ' · ' + row.month + ' ' + row.year + ': ' + money(row[item.key]) + '</title></circle>';
+          svg += '<circle class="point ' + item.className + '" cx="' + x(index) + '" cy="' + y(row[item.key]) + '" r="4"><title>' + money(row[item.key]) + '</title></circle>';
         });
       });
       host.innerHTML = svg + '</svg>';
