@@ -437,6 +437,24 @@
       .month-control[hidden]{display:flex;visibility:hidden}
     }
   </style>
+  <style>
+    .accounts-import-trigger{grid-column:1/-1;justify-self:start;border:1px solid #dfe6df;border-radius:8px;background:#284b38;color:#fff;padding:10px 14px;font-size:12px;font-weight:700;cursor:pointer}
+    .accounts-import-trigger:hover{background:#315b3d}
+    .bauhaus .accounts-import-trigger{border:2px solid var(--ink);border-radius:0;background:var(--red);box-shadow:3px 3px 0 var(--ink);text-transform:uppercase;font-weight:850}
+    .import-dialog{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:#f4f6f2;color:#26352c;overflow:auto}
+    .import-dialog::backdrop{background:#17221e99}
+    .import-dialog-head{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;background:#fff;border-bottom:1px solid #dfe6df}
+    .import-dialog-head h2{margin:0;font-size:18px}
+    .import-dialog-close{border:1px solid #dfe6df;border-radius:7px;background:#fff;color:#46634f;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer}
+    .import-dialog-content{max-width:1100px;margin:0 auto;padding:24px}
+    .import-dialog-content .form{min-height:calc(100dvh - 110px);padding:24px;background:#fff;border:1px solid #e5eae5;border-radius:14px;box-shadow:0 8px 24px #203b2610}
+    .import-dialog-content .upload-preview{max-height:55vh}
+    .bauhaus .import-dialog{background:var(--paper);color:var(--ink)}
+    .bauhaus .import-dialog-head{background:var(--card);border-bottom:2px solid var(--ink)}
+    .bauhaus .import-dialog-close{border:1.5px solid var(--ink);border-radius:0;background:var(--yellow);color:var(--ink);text-transform:uppercase;font-weight:850}
+    .bauhaus .import-dialog-content .form{border:2px solid var(--ink);border-radius:0;box-shadow:5px 5px 0 var(--ink)}
+    @media(max-width:620px){.import-dialog-head{padding:12px 14px}.import-dialog-content{padding:12px}.import-dialog-content .form{min-height:calc(100dvh - 72px);padding:18px}}
+  </style>
 </head>
 <body>
   <main class="shell">
@@ -495,6 +513,7 @@
     </section>
 
     <div class="layout" id="accounts-page" hidden>
+      <button type="button" class="accounts-import-trigger" id="open-import-dialog">Import transactions</button>
       <section class="panel transactions">
         <div class="panel-head">
           <div>
@@ -520,6 +539,15 @@
           <button type="button" class="budget-config-save" id="recalculate-account-balances">Recalculate from ledger</button>
           <p class="status" id="account-balances-status" role="status"></p>
         </section>
+      </aside>
+    </div>
+
+    <dialog id="import-dialog" class="import-dialog" aria-labelledby="import-dialog-title">
+      <header class="import-dialog-head">
+        <h2 id="import-dialog-title">Import transactions</h2>
+        <button type="button" class="import-dialog-close" id="close-import-dialog">Close</button>
+      </header>
+      <div class="import-dialog-content">
         <section class="panel form">
           <h2>Import transactions</h2>
           <p class="upload-note">Upload a CSV or TSV statement. Transactions are checked against this account’s entries for the configured budget year, then new rows are added to their month tabs.</p>
@@ -536,8 +564,8 @@
           <div id="upload-preview" class="upload-preview" hidden></div>
           <button class="primary" id="import-button" type="button" disabled>Import new transactions</button>
         </section>
-      </aside>
-    </div>
+      </div>
+    </dialog>
 
     <section class="panel budget-page" id="budgets-page" hidden>
       <div class="budget-head">
@@ -1945,6 +1973,11 @@
     $('ledger-form').addEventListener('submit', moveLedgerFunds);
     $('allow-user-form').addEventListener('submit', saveAllowedUser);
     $('allow-user-list').addEventListener('click', removeAllowedUser);
+    $('open-import-dialog').addEventListener('click', () => $('import-dialog').showModal());
+    $('close-import-dialog').addEventListener('click', () => $('import-dialog').close());
+    $('import-dialog').addEventListener('click', event => {
+      if (event.target === $('import-dialog')) $('import-dialog').close();
+    });
     
     $('ytd-chart').addEventListener('click', e => {
       const button = e.target.closest('.ytd-legend-item');
