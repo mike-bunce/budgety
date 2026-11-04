@@ -618,10 +618,17 @@
       <header class="graph-card-head">
         <div>
           <h2>Budget Config</h2>
-          <p>Edit category groups and names, and monthly budgets. Average monthly spend is calculated from January through the selected month. Set the Income row’s monthly income target here. Renaming a category also updates matching transactions.</p>
+          <p>Set category budgets and groups. The Savings budget balances the guide income against the other category budgets. Guide income uses the average of months with recorded income; renaming a category also updates matching transactions.</p>
         </div>
         <span id="budget-config-status" role="status"></span>
       </header>
+      <div class="budget-category-add" style="align-items:center;justify-content:space-between">
+        <strong>Guide income: <span id="budget-guide-value">—</span></strong>
+      </div>
+      <form class="budget-category-add" id="budget-expected-income-form" hidden>
+        <label>Expected average monthly income for the first month<input id="expected-monthly-income" type="number" min="0" step="0.01" required></label>
+        <button class="budget-config-save" type="submit">Set income guide</button>
+      </form>
       <form class="budget-category-add" id="budget-category-add">
         <label>New category<input id="new-category-name" type="text" maxlength="60" required placeholder="Category name"></label>
         <label>Group<input id="new-category-group" type="text" maxlength="40" value="Other" placeholder="Group"></label>
@@ -1302,6 +1309,8 @@
 
     function renderBudgetConfig() {
       if (!state.data) return;
+      $('budget-guide-value').textContent = state.data.guideIncome == null ? '—' : money(state.data.guideIncome);
+      $('budget-expected-income-form').hidden = !state.data.needsExpectedIncome;
       const groups = Array.from(new Set(state.data.budgets.map(item => String(item.group || 'Other').trim() || 'Other')));
       if (!groups.some(group => group.toLowerCase() === 'other')) groups.push('Other');
       
@@ -1315,7 +1324,8 @@
           return '<option value="' + escapeHtml(option) + '" ' + (option === group ? 'selected' : '') + ' style="background:' + optionColors[0] + ';color:' + optionColors[1] + '">' + escapeHtml(option) + '</option>';
         }).join('') + '</select>';
         
-        return '<tr data-row="' + item.sheetRow + '" data-income="' + String(Boolean(item.isIncome)) + '"><td>' + groupSelect + '</td><td><input class="budget-category-name" type="text" maxlength="60" value="' + escapeHtml(item.category) + '" aria-label="Category name" ' + (item.isIncome ? 'readonly' : '') + '></td><td class="num">' + (item.averageMonthlySpend == null ? '—' : money(item.averageMonthlySpend)) + '</td><td class="num"><input class="budget-category-amount" type="number" min="0" step="0.01" value="' + Number(item.budget || 0) + '" aria-label="' + (item.isIncome ? 'Monthly income target' : 'Monthly budget for ' + escapeHtml(item.category)) + '"></td><td><button type="button" class="budget-config-save budget-category-save" data-row="' + item.sheetRow + '">Save</button></td></tr>';
+        const isSavings = String(item.category || '').trim().toLowerCase() === 'savings';
+        return '<tr data-row="' + item.sheetRow + '" data-income="' + String(Boolean(item.isIncome)) + '"><td>' + groupSelect + '</td><td><input class="budget-category-name" type="text" maxlength="60" value="' + escapeHtml(item.category) + '" aria-label="Category name" ' + (item.isIncome || isSavings ? 'readonly' : '') + '></td><td class="num">' + (item.averageMonthlySpend == null ? '—' : money(item.averageMonthlySpend)) + '</td><td class="num"><input class="budget-category-amount" type="number" min="0" step="0.01" value="' + Number(item.budget || 0) + '" aria-label="' + (item.isIncome ? 'Monthly income target' : 'Monthly budget for ' + escapeHtml(item.category)) + '" ' + (isSavings ? 'readonly' : '') + '></td><td><button type="button" class="budget-config-save budget-category-save" data-row="' + item.sheetRow + '">Save</button></td></tr>';
       }).join('');
       
       $('budget-config-body').querySelectorAll('.budget-category-group').forEach(select => {
@@ -1427,6 +1437,23 @@
           button.disabled = false;
         })
         .addBudgetCategory($('new-category-name').value, $('new-category-group').value, $('new-category-budget').value);
+    }
+
+    function saveExpectedMonthlyIncome(event) {
+      event.preventDefault();
+      const form = $('budget-expected-income-form'), button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      $('budget-config-status').textContent = 'Saving income guide…';
+      google.script.run
+        .withSuccessHandler(result => {
+          $('budget-config-status').textContent = 'Income guide set to ' + money(result.guideIncome) + '.';
+          loadBudgetPage();
+        })
+        .withFailureHandler(error => {
+          $('budget-config-status').textContent = error.message;
+          button.disabled = false;
+        })
+        .saveBudgetGuideIncome($('expected-monthly-income').value);
     }
 
     function expenseDayLabel(value) {
@@ -1971,6 +1998,7 @@
     });
 
     $('budget-category-add').addEventListener('submit', addBudgetCategory);
+    $('budget-expected-income-form').addEventListener('submit', saveExpectedMonthlyIncome);
     $('ledger-form').addEventListener('submit', moveLedgerFunds);
     $('allow-user-form').addEventListener('submit', saveAllowedUser);
     $('allow-user-list').addEventListener('click', removeAllowedUser);
